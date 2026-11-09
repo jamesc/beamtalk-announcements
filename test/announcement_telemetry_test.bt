@@ -1,0 +1,111 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+// BT-2193: AnnouncementTelemetry, the announcements → telemetry bridge.
+//
+// The telemetry handler records what it receives in an Ets table, keyed by
+// the last event-name element: it runs in the emitting process and, being a
+// stored block, cannot assign the test's locals. `announceAndWait:` returns
+// only once the bridge's handler has run, so no polling is needed.
+
+TestCase subclass: AnnouncementTelemetryTest
+  field: table = nil
+
+  class serial -> Boolean => true
+
+  setUp =>
+    self withTable: (Ets new: #announcementTelemetryTestEvents type: #set)
+
+  tearDown =>
+    Telemetry detach: #announcementTelemetryTest
+    self.table isNil ifFalse: [[self.table delete] on: Error do: [:e | nil]]
+
+  /// Record every telemetry event named `prefix ++ #(<suffix>)` for each of
+  /// `suffixes`, keyed by its suffix.
+  record: prefix suffixes: suffixes =>
+    t := self.table
+    (Telemetry
+      attach: #announcementTelemetryTest
+      toAll: (suffixes collect: [:s | prefix ++ #(s)])
+      do: [:event :measurements :metadata |
+        t at: event last put: #(event, measurements, metadata)
+      ]) unwrap
+
+  testDefaultPrefix =>
+    self assert: AnnouncementTelemetry defaultPrefix equals: #(#beamtalk, #announcement)
+
+  testForwardEmitsUnderDefaultPrefix =>
+    self record: #(#beamtalk, #announcement) suffixes: #(#PriceChanged)
+    announcer := Announcer new
+    sub := AnnouncementTelemetry forward: PriceChanged from: announcer
+    event := PriceChanged newPrice: 42
+    announcer announceAndWait: event
+    #[name, measurements, metadata] := self.table at: #PriceChanged
+    self assert: name equals: #(#beamtalk, #announcement, #PriceChanged)
+    self assert: (measurements at: #count) equals: 1
+    self assert: ((measurements at: #system_time) isKindOf: Integer)
+    self assert: (metadata at: #announcement) equals: event
+    self assert: (metadata at: #class) equals: PriceChanged
+    sub unsubscribe
+
+  testForwardUsesCustomPrefix =>
+    self record: #(#shop, #events) suffixes: #(#ItemSold)
+    announcer := Announcer new
+    sub := AnnouncementTelemetry
+      forward: ItemSold
+      from: announcer
+      prefix: #(#shop, #events)
+    announcer announceAndWait: (ItemSold sku: "A1")
+    #[name, _m, _meta] := self.table at: #ItemSold
+    self assert: name equals: #(#shop, #events, #ItemSold)
+    sub unsubscribe
+
+  testForwardNamesTheEventsOwnClass =>
+    // Subscribed to the superclass, emitted under each subclass's name.
+    self record: #(#shop) suffixes: #(#PriceChanged, #ItemSold, #ShopEvent)
+    announcer := Announcer new
+    sub := AnnouncementTelemetry
+      forward: ShopEvent
+      from: announcer
+      prefix: #(#shop)
+    announcer announceAndWait: (PriceChanged newPrice: 1)
+    announcer announceAndWait: (ItemSold sku: "A1")
+    self assert: (self.table includesKey: #PriceChanged)
+    self assert: (self.table includesKey: #ItemSold)
+    self deny: (self.table includesKey: #ShopEvent)
+    sub unsubscribe
+
+  testForwardIgnoresOtherClasses =>
+    self record: #(#shop) suffixes: #(#ItemSold)
+    announcer := Announcer new
+    sub := AnnouncementTelemetry
+      forward: PriceChanged
+      from: announcer
+      prefix: #(#shop)
+    announcer announceAndWait: (ItemSold sku: "A1")
+    self deny: (self.table includesKey: #ItemSold)
+    sub unsubscribe
+
+  testUnsubscribeStopsForwarding =>
+    self record: #(#shop) suffixes: #(#PriceChanged)
+    announcer := Announcer new
+    sub := AnnouncementTelemetry
+      forward: PriceChanged
+      from: announcer
+      prefix: #(#shop)
+    sub unsubscribe
+    announcer announceAndWait: (PriceChanged newPrice: 1)
+    self deny: (self.table includesKey: #PriceChanged)
+
+  testForwardReturnsASubscription =>
+    sub := AnnouncementTelemetry forward: PriceChanged from: Announcer new
+    self assert: sub class equals: Subscription
+    self assert: sub isActive
+    sub unsubscribe
+
+  testEmitDirectly =>
+    self record: #(#shop) suffixes: #(#PriceChanged)
+    event := PriceChanged newPrice: 7
+    self assert: (AnnouncementTelemetry emit: event prefix: #(#shop)) equals: nil
+    #[_name, _m, metadata] := self.table at: #PriceChanged
+    self assert: (metadata at: #announcement) equals: event

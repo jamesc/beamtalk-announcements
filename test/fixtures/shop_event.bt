@@ -1,0 +1,7 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+// Test fixture: the base of a small announcement hierarchy, so tests can
+// subscribe to a superclass and announce a subclass.
+
+Announcement subclass: ShopEvent

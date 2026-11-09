@@ -1,0 +1,81 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+/// AnnouncementTelemetry — re-emit announcements as `telemetry` events
+/// (ADR 0093 §3–§4).
+///
+/// Announcements are typed domain events you react to; `telemetry` is the
+/// measurement bus that metrics exporters, LiveDashboard and
+/// `opentelemetry_telemetry` read. This bridge subscribes to an announcer and,
+/// for each matching announcement, emits one `Telemetry execute:` event:
+///
+/// - **name**: `prefix ++ #(<event class name>)`, for example
+///   `#(#beamtalk, #announcement, #PriceChanged)`. The class is the event's
+///   own class, not the class subscribed to, so subscribing to `UIEvent`
+///   emits `#ButtonClicked` for a `ButtonClicked`.
+/// - **measurements**: `#{#count => 1, #system_time => <native units>}`,
+///   following `telemetry`'s convention of native-unit timestamps.
+/// - **metadata**: `#{#announcement => <the event>, #class => <its class>}`.
+///
+/// The result is an ordinary `Subscription`: `unsubscribe` it to stop
+/// forwarding. Like every subscription, it lasts as long as the process that
+/// made it, so start a long-lived bridge from an actor or supervisor child.
+///
+/// ## Examples
+/// ```beamtalk
+/// sub := AnnouncementTelemetry forward: PriceChanged from: announcer
+/// // a PriceChanged now also emits #(#beamtalk, #announcement, #PriceChanged)
+/// sub unsubscribe
+/// ```
+typed Object subclass: AnnouncementTelemetry
+
+  /// The event-name prefix `forward:from:` uses.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// AnnouncementTelemetry defaultPrefix   // => #(#beamtalk, #announcement)
+  /// ```
+  class defaultPrefix -> List(Symbol) => #(#beamtalk, #announcement)
+
+  /// Forward announcements of `aClass` (and its subclasses) on `anAnnouncer`
+  /// to `telemetry`, under `defaultPrefix`.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// sub := AnnouncementTelemetry forward: PriceChanged from: announcer
+  /// ```
+  class forward: aClass :: Class from: anAnnouncer :: Announcer -> Subscription =>
+    // BT-4599: the checker rejects forwarding a `:: Class` parameter.
+    @expect type
+    self
+      forward: aClass
+      from: anAnnouncer
+      prefix: self defaultPrefix
+
+  /// Forward announcements of `aClass` (and its subclasses) on `anAnnouncer`
+  /// to `telemetry` as `prefix ++ #(<event class name>)`.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// AnnouncementTelemetry forward: PriceChanged from: announcer prefix: #(#shop, #events)
+  /// ```
+  class forward: aClass :: Class from: anAnnouncer :: Announcer prefix: prefix :: List(Symbol) -> Subscription =>
+    // BT-4599: the checker rejects forwarding a `:: Class` parameter. The
+    // block's `event` is Dynamic: its class is whatever `aClass` names.
+    @expect type
+    anAnnouncer when: aClass do: [:event | self emit: event prefix: prefix]
+
+  /// Emit `event` as one telemetry event under `prefix`. `forward:from:`
+  /// calls this for each announcement; call it directly to bridge a single
+  /// event by hand.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// AnnouncementTelemetry emit: (PriceChanged newPrice: 42) prefix: #(#shop)
+  /// // => nil
+  /// ```
+  class emit: event :: Announcement prefix: prefix :: List(Symbol) -> Nil =>
+    Telemetry
+      execute: prefix ++ #(event class name)
+      measurements: #{#count => 1, #system_time => (Time systemTime: #native)}
+      metadata: #{#announcement => event, #class => event class}

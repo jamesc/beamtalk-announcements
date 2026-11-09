@@ -1,0 +1,111 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+/// RecordingAnnouncer — an `Announcer` test double that records every
+/// `announce:` instead of dispatching it (ADR 0093 §3).
+///
+/// Pass one to the code under test wherever it expects an `Announcer`, then
+/// assert on what was announced. No subscriber ever runs: `announce:`,
+/// `announceAndWait:` and `announceAndWait:timeout:` only append the event to
+/// the recorder's log, in order. Subscribing still works as on a real
+/// `Announcer`, so `subscriptionCount` and `subscribersOf:` tell you what the
+/// code under test subscribed to.
+///
+/// The log belongs to the process that created the recorder and goes away
+/// when that process exits. Any process may announce into it.
+///
+/// ## Examples
+/// ```beamtalk
+/// recorder := RecordingAnnouncer new
+/// recorder announce: (PriceChanged newPrice: 42)
+/// recorder announcements size              // => 1
+/// recorder hasAnnounced: PriceChanged      // => true
+/// recorder reset
+/// recorder announcementCount               // => 0
+/// ```
+typed Announcer subclass: RecordingAnnouncer
+
+  /// Create a recorder with an empty log.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// RecordingAnnouncer new class   // => RecordingAnnouncer
+  /// ```
+  class new -> RecordingAnnouncer => (Erlang beamtalk_recording_announcer) new
+
+  // === Announcing (records, never dispatches) ===
+
+  /// Record `anEvent`. Subscribers are not run.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder announce: (PriceChanged newPrice: 42)
+  /// ```
+  announce: anEvent :: Announcement -> Nil =>
+    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+
+  /// Record `anEvent`. Subscribers are not run, so there is nothing to wait for.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder announceAndWait: (PriceChanged newPrice: 42)
+  /// ```
+  announceAndWait: anEvent :: Announcement -> Nil =>
+    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+
+  /// Record `anEvent`; the timeout is ignored.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder announceAndWait: (PriceChanged newPrice: 42) timeout: 100
+  /// ```
+  announceAndWait: anEvent :: Announcement timeout: _ms :: Integer -> Nil =>
+    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+
+  // === Inspecting the log ===
+
+  /// Every recorded event, oldest first.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder announce: (PriceChanged newPrice: 42)
+  /// recorder announcements first newPrice   // => 42
+  /// ```
+  announcements -> List(Announcement) =>
+    (Erlang beamtalk_recording_announcer) announcements: self
+
+  /// The recorded events that are instances of `aClass` or a subclass of it,
+  /// oldest first. Matches the way subscriptions match.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// (recorder announcementsOf: UIEvent) size   // => 1
+  /// ```
+  announcementsOf: aClass :: Class -> List(Announcement) =>
+    self announcements select: [:e | e isKindOf: aClass]
+
+  /// Whether an instance of `aClass` (or a subclass) has been recorded.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder hasAnnounced: PriceChanged   // => false
+  /// ```
+  hasAnnounced: aClass :: Class -> Boolean =>
+    self announcements anySatisfy: [:e | e isKindOf: aClass]
+
+  /// The number of recorded events.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder announcementCount   // => 0
+  /// ```
+  announcementCount -> Integer => self announcements size
+
+  /// Forget every recorded event. Subscriptions are kept.
+  ///
+  /// ## Examples
+  /// ```beamtalk
+  /// recorder reset
+  /// recorder announcementCount   // => 0
+  /// ```
+  reset -> Nil => (Erlang beamtalk_recording_announcer) reset: self

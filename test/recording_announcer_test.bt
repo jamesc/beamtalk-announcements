@@ -1,0 +1,111 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+// BT-2193: RecordingAnnouncer, the announcements test double.
+//
+// Handlers that would prove a dispatch announce into a second recorder: a
+// handler runs in another process and, being a stored block, cannot assign
+// the test's locals, but any process may record into a recorder.
+
+TestCase subclass: RecordingAnnouncerTest
+
+  // === Construction ===
+  testNewIsARecordingAnnouncer =>
+    recorder := RecordingAnnouncer new
+    self assert: recorder class equals: RecordingAnnouncer
+    self assert: (recorder isKindOf: Announcer)
+    self assert: recorder announcementCount equals: 0
+
+  testRecordersAreIsolated =>
+    a := RecordingAnnouncer new
+    b := RecordingAnnouncer new
+    a announce: (PriceChanged newPrice: 1)
+    self assert: a announcementCount equals: 1
+    self assert: b announcementCount equals: 0
+
+  // === Recording ===
+  testAnnounceRecordsInOrder =>
+    recorder := RecordingAnnouncer new
+    recorder announce: (PriceChanged newPrice: 1)
+    recorder announce: (ItemSold sku: "A1")
+    recorder announce: (PriceChanged newPrice: 2)
+    self assert: recorder announcements equals: #((PriceChanged newPrice: 1), (ItemSold sku: "A1"), (PriceChanged newPrice: 2))
+
+  testAnnounceAndWaitRecords =>
+    recorder := RecordingAnnouncer new
+    self assert: (recorder announceAndWait: (PriceChanged newPrice: 3)) equals: nil
+    self assert: (recorder announceAndWait: (PriceChanged newPrice: 4) timeout: 1) equals: nil
+    self assert: recorder announcements equals: #((PriceChanged newPrice: 3), (PriceChanged newPrice: 4))
+
+  testAnnounceAnswersNil =>
+    recorder := RecordingAnnouncer new
+    self assert: (recorder announce: (PriceChanged newPrice: 1)) equals: nil
+
+  // === Recording never dispatches ===
+  testAnnounceDoesNotRunSubscribers =>
+    recorder := RecordingAnnouncer new
+    sink := RecordingAnnouncer new
+    recorder when: ShopEvent do: [:e | sink announce: e]
+    recorder announce: (PriceChanged newPrice: 1)
+    recorder announceAndWait: (PriceChanged newPrice: 2)
+    Timer sleep: 50
+    self assert: sink announcementCount equals: 0
+
+  testSinkSeesARealDispatch =>
+    // Control for the test above: the same handler on a real Announcer does
+    // reach the sink.
+    announcer := Announcer new
+    sink := RecordingAnnouncer new
+    announcer when: ShopEvent do: [:e | sink announce: e]
+    announcer announceAndWait: (PriceChanged newPrice: 2)
+    self assert: sink announcements equals: #((PriceChanged newPrice: 2))
+
+  // === Querying the log ===
+  testAnnouncementsOfMatchesSubclasses =>
+    recorder := RecordingAnnouncer new
+    recorder announce: (PriceChanged newPrice: 1)
+    recorder announce: (ItemSold sku: "A1")
+    self assert: (recorder announcementsOf: PriceChanged) equals: #((PriceChanged newPrice: 1))
+    self assert: (recorder announcementsOf: ShopEvent) size equals: 2
+    self assert: (recorder announcementsOf: Announcement) size equals: 2
+
+  testHasAnnounced =>
+    recorder := RecordingAnnouncer new
+    self deny: (recorder hasAnnounced: ShopEvent)
+    recorder announce: (ItemSold sku: "A1")
+    self assert: (recorder hasAnnounced: ItemSold)
+    self assert: (recorder hasAnnounced: ShopEvent)
+    self deny: (recorder hasAnnounced: PriceChanged)
+
+  testRecordsFromAnotherProcess =>
+    recorder := RecordingAnnouncer new
+    announcer := Announcer new
+    announcer when: ShopEvent do: [:e | recorder announce: e]
+    announcer announceAndWait: (ItemSold sku: "B2")
+    self assert: (recorder hasAnnounced: ItemSold)
+
+  // === Reset ===
+  testResetClearsTheLog =>
+    recorder := RecordingAnnouncer new
+    recorder announce: (PriceChanged newPrice: 1)
+    self assert: recorder reset equals: nil
+    self assert: recorder announcementCount equals: 0
+    recorder announce: (PriceChanged newPrice: 2)
+    self assert: recorder announcements equals: #((PriceChanged newPrice: 2))
+
+  testResetKeepsSubscriptions =>
+    recorder := RecordingAnnouncer new
+    sub := recorder when: ShopEvent do: [:e | nil]
+    recorder reset
+    self assert: recorder subscriptionCount equals: 1
+    sub unsubscribe
+
+  // === Inherited subscription introspection ===
+  testSubscriptionsAreVisible =>
+    recorder := RecordingAnnouncer new
+    sub := recorder when: PriceChanged do: [:e | nil]
+    self assert: recorder subscriptionCount equals: 1
+    self assert: (recorder subscribersOf: PriceChanged) size equals: 1
+    self assert: (recorder subscribersOf: ItemSold) size equals: 0
+    sub unsubscribe
+    self assert: recorder subscriptionCount equals: 0
