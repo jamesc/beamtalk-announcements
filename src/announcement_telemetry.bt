@@ -45,8 +45,6 @@ typed Object subclass: AnnouncementTelemetry
   /// sub := AnnouncementTelemetry forward: PriceChanged from: announcer
   /// ```
   class forward: aClass :: Class from: anAnnouncer :: Announcer -> Subscription =>
-    // BT-4599: the checker rejects forwarding a `:: Class` parameter.
-    @expect type
     self
       forward: aClass
       from: anAnnouncer
@@ -60,8 +58,7 @@ typed Object subclass: AnnouncementTelemetry
   /// AnnouncementTelemetry forward: PriceChanged from: announcer prefix: #(#shop, #events)
   /// ```
   class forward: aClass :: Class from: anAnnouncer :: Announcer prefix: prefix :: List(Symbol) -> Subscription =>
-    // BT-4599: the checker rejects forwarding a `:: Class` parameter. The
-    // block's `event` is Dynamic: its class is whatever `aClass` names.
+    // The block's `event` is Dynamic: its class is whatever `aClass` names.
     @expect type
     anAnnouncer when: aClass do: [:event | self emit: event prefix: prefix]
 
