@@ -7,3 +7,6 @@ version = "0.1.0"
 description = "Optional extras for Beamtalk announcements: RecordingAnnouncer and a telemetry bridge"
 
 [dependencies]
+
+[stubs]
+path = "stubs/"

@@ -1,0 +1,20 @@
+// Copyright 2026 James Casey
+// SPDX-License-Identifier: Apache-2.0
+
+/// Type declarations for `native/beamtalk_recording_announcer.erl`.
+///
+/// Declared here so `beamtalk lint` and `beamtalk build` see the types even
+/// before the native module has been compiled (e.g. right after `clean`).
+declare native: beamtalk_recording_announcer
+
+  /// Mint a recorder handle with a fresh, empty log owned by the caller.
+  new -> RecordingAnnouncer
+
+  /// Append `event` to the recorder's log. Never dispatches it.
+  record: recorder :: RecordingAnnouncer event: event :: Announcement -> Nil
+
+  /// Every recorded event, oldest first.
+  announcements: recorder :: RecordingAnnouncer -> List(Announcement)
+
+  /// Forget every recorded event.
+  reset: recorder :: RecordingAnnouncer -> Nil
