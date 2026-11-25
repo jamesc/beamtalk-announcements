@@ -31,7 +31,8 @@ typed Announcer subclass: RecordingAnnouncer
   /// ```beamtalk
   /// RecordingAnnouncer new class   // => RecordingAnnouncer
   /// ```
-  class new -> RecordingAnnouncer => (Erlang beamtalk_recording_announcer) new
+  class new -> RecordingAnnouncer =>
+    (Erlang announcements_recording_announcer) new
 
   // === Announcing (records, never dispatches) ===
 
@@ -42,7 +43,7 @@ typed Announcer subclass: RecordingAnnouncer
   /// recorder announce: (PriceChanged newPrice: 42)
   /// ```
   announce: anEvent :: Announcement -> Nil =>
-    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+    (Erlang announcements_recording_announcer) record: self event: anEvent
 
   /// Record `anEvent`. Subscribers are not run, so there is nothing to wait for.
   ///
@@ -51,7 +52,7 @@ typed Announcer subclass: RecordingAnnouncer
   /// recorder announceAndWait: (PriceChanged newPrice: 42)
   /// ```
   announceAndWait: anEvent :: Announcement -> Nil =>
-    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+    (Erlang announcements_recording_announcer) record: self event: anEvent
 
   /// Record `anEvent`; the timeout is ignored.
   ///
@@ -60,7 +61,7 @@ typed Announcer subclass: RecordingAnnouncer
   /// recorder announceAndWait: (PriceChanged newPrice: 42) timeout: 100
   /// ```
   announceAndWait: anEvent :: Announcement timeout: _ms :: Integer -> Nil =>
-    (Erlang beamtalk_recording_announcer) record: self event: anEvent
+    (Erlang announcements_recording_announcer) record: self event: anEvent
 
   // === Inspecting the log ===
 
@@ -72,7 +73,7 @@ typed Announcer subclass: RecordingAnnouncer
   /// recorder announcements first newPrice   // => 42
   /// ```
   announcements -> List(Announcement) =>
-    (Erlang beamtalk_recording_announcer) announcements: self
+    (Erlang announcements_recording_announcer) announcements: self
 
   /// The recorded events that are instances of `aClass` or a subclass of it,
   /// oldest first. Matches the way subscriptions match.
@@ -108,4 +109,4 @@ typed Announcer subclass: RecordingAnnouncer
   /// recorder reset
   /// recorder announcementCount   // => 0
   /// ```
-  reset -> Nil => (Erlang beamtalk_recording_announcer) reset: self
+  reset -> Nil => (Erlang announcements_recording_announcer) reset: self
