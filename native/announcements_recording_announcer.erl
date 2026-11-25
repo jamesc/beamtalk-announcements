@@ -1,7 +1,7 @@
 %% Copyright 2026 James Casey
 %% SPDX-License-Identifier: Apache-2.0
 
--module(beamtalk_recording_announcer).
+-module(announcements_recording_announcer).
 
 -moduledoc """
 Backing store for `RecordingAnnouncer`, the announcements test double.
@@ -34,7 +34,7 @@ Any process may record into it.
 -doc "Mint a recorder handle with a fresh, empty log owned by the caller.".
 -spec new() -> recorder().
 new() ->
-    Log = ets:new(beamtalk_recording_announcer, [ordered_set, public]),
+    Log = ets:new(announcements_recording_announcer, [ordered_set, public]),
     #{'$beamtalk_class' => 'RecordingAnnouncer', ref => make_ref(), log => Log}.
 
 -doc "Append `Event` to the recorder's log. Never dispatches it.".

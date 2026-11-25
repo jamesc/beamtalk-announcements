@@ -3,7 +3,7 @@
 
 [package]
 name = "announcements"
-version = "0.1.1"
+version = "0.1.2"
 description = "Optional extras for Beamtalk announcements: RecordingAnnouncer and a telemetry bridge"
 
 [dependencies]
