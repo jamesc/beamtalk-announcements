@@ -38,5 +38,8 @@ jobs:
       - name: Build
         run: just build
 
+      - name: Check (warnings as errors)
+        run: just check
+
       - name: Test
         run: just test
