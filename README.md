@@ -74,5 +74,5 @@ created it. Start a long-lived bridge from an actor or supervisor child.
 ```bash
 just build
 just test
-just ci     # fmt + lint + build + test
+just ci     # fmt + lint + build + check + test
 ```

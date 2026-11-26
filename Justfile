@@ -28,8 +28,14 @@ lint:
 clean:
     rm -rf _build
 
-# Full CI check (fmt + lint + build + test)
-ci: fmt lint build test
+# Type-check with warnings as errors. Builds first: `check` only sees the
+# package's own native -spec types from built artifacts (BT-5342), so on a
+# clean tree it would report every native FFI call as untyped Dynamic.
+check: build
+    beamtalk check --warnings-as-errors
+
+# Full CI check (fmt + lint + build + check + test)
+ci: fmt lint build check test
 
 # Tag a release from beamtalk.toml version
 release:

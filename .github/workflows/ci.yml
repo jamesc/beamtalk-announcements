@@ -35,8 +35,8 @@ jobs:
         run: just lint
         continue-on-error: true
 
-      - name: Build
-        run: just build
+      - name: Build and check (warnings as errors)
+        run: just check
 
       - name: Test
         run: just test

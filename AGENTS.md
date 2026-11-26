@@ -31,9 +31,10 @@ beamtalk build       # Compile to BEAM bytecode
 beamtalk test        # Run BUnit tests
 beamtalk fmt         # Format sources in place (fmt-check to verify)
 beamtalk lint        # Style and redundancy checks
+beamtalk check --warnings-as-errors  # Type-check; run after build (just check)
 beamtalk repl        # Interactive development (auto-loads the package)
 beamtalk run         # Run an application (projects created with --app)
-just ci              # fmt + lint + build + test, as CI runs it
+just ci              # fmt + lint + build + check + test, as CI runs it
 ```
 
 Dependencies: `beamtalk deps add <name>` (registry), `--git <url>` or
